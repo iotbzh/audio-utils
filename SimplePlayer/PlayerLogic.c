@@ -140,9 +140,9 @@ STATIC  int asyncReadCB (sd_event_source* src, int fileFd, uint32_t revents, voi
 PUBLIC void playTest(struct afb_req request) {
     int err, timeout=0, fileFd;
     unsigned int channels, rate, period;
-    snd_pcm_hw_params_t *params;
+    snd_pcm_hw_params_t *hwparams;
+    hwparamsT wavParams;
     aplayHandleT *aplayHandle=NULL;
-    hwparamsT hwparams;
     u_char *audiobuf;
 
     
@@ -176,65 +176,68 @@ PUBLIC void playTest(struct afb_req request) {
         goto OnErrorExit;            
     }
 
-
-    ssize_t dtawave = test_wavefile(request, fileFd, &hwparams, audiobuf, dta);
+    ssize_t dtawave = test_wavefile(request, fileFd, &wavParams, audiobuf, dta);
     if (dtawave <0) {
         afb_req_fail_f (request, "infile-wav", "Fail to read file WAV header file Filename=[%s]", tmp);
         goto OnErrorExit;            
     }
     free(audiobuf);
-    
+
     err = snd_pcm_open(&aplayHandle->pcmHandle, pcmname, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
     if (err) {
         afb_req_fail_f (request, "pcm-open", "fail to open PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
         goto OnErrorExit;
     }
-
+    
     // Load target PCM default config
     aplayHandle= alloca (sizeof(aplayHandleT));
-    snd_pcm_hw_params_alloca(&params);
-    snd_pcm_hw_params_any(aplayHandle->pcmHandle, params);  
-
-    // set PCM to play wav data
-    err = snd_pcm_open(&aplayHandle->pcmHandle, pcmname, SND_PCM_STREAM_PLAYBACK, 0);
-    if (err) {
-        aplayHandle=NULL;
-        afb_req_fail_f (request, "pcm-invalid", "fail to open PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
-        goto OnErrorExit;
-    }
-    
-    err = snd_pcm_hw_params_set_access(aplayHandle->pcmHandle, params,SND_PCM_ACCESS_RW_INTERLEAVED);
+    snd_pcm_hw_params_alloca(&hwparams);
+    snd_pcm_hw_params_any(aplayHandle->pcmHandle, hwparams); 
+  
+    err = snd_pcm_hw_params_set_access(aplayHandle->pcmHandle, hwparams,SND_PCM_ACCESS_RW_INTERLEAVED);
     if (err) {
         afb_req_fail_f (request, "pcm-interleave", "fail to set Interleave mode PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
         goto OnErrorExit;
     }
 
-    err = snd_pcm_hw_params_set_format(aplayHandle->pcmHandle, params, SND_PCM_FORMAT_S16_LE);
+    err = snd_pcm_hw_params_set_format(aplayHandle->pcmHandle, hwparams, wavParams.format);
     if (err) {
-        afb_req_fail_f (request, "pcm-format", "fail to set S16LE format PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
+        afb_req_fail_f (request, "pcm-format", "fail to set format=%d PCM=[%s] Err=%s",  wavParams.format, pcmname, snd_strerror(err));
         goto OnErrorExit;
     }
     
-    err= snd_pcm_hw_params(aplayHandle->pcmHandle, params);
+    err = snd_pcm_hw_params_set_channels(aplayHandle->pcmHandle, hwparams, wavParams.channels);
     if (err) {
-        afb_req_fail_f (request, "pcm-params", "fail to write config params PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
+        afb_req_fail_f (request, "pcm-format", "fail to set channels=%d PCM=[%s] Err=%s",  wavParams.format, wavParams.channels, snd_strerror(err));
+        goto OnErrorExit;
+    }
+    
+    err = snd_pcm_hw_params_set_rate_near (aplayHandle->pcmHandle, hwparams, &wavParams.rate, 0);
+    if (err) {
+        afb_req_fail_f (request, "pcm-format", "fail to set rate=%d PCM=[%s] Err=%s",  wavParams.format, wavParams.rate, snd_strerror(err));
+        goto OnErrorExit;
+    }
+    
+    err= snd_pcm_hw_params(aplayHandle->pcmHandle, hwparams);
+    if (err) {
+        afb_req_fail_f (request, "pcm-hwparams", "fail to write config hwparams PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
         goto OnErrorExit;
     }
     
     // some debug info to make sure we're on track
-    snd_pcm_hw_params_get_channels(params, &channels);
-    snd_pcm_hw_params_get_rate(params, &rate, 0);
+    snd_pcm_hw_params_get_channels(hwparams, &channels);
+    snd_pcm_hw_params_get_rate(hwparams, &rate, 0);
     DEBUG (afbIface, "PCM name=[%s] STATE=[%d] Channel=%d Rate=%d",  snd_pcm_name(aplayHandle->pcmHandle), snd_pcm_state(aplayHandle->pcmHandle), channels, rate);
 
     // allocate buffer to hold single period 
-    err= snd_pcm_hw_params_get_period_size(params, &aplayHandle->frameSz, 0);
+    err= snd_pcm_hw_params_get_period_size(hwparams, &aplayHandle->frameSz, 0);
     aplayHandle->byteIn  = 0;
     aplayHandle->byteOut = 0;
     aplayHandle->frameCt  = 0;
     aplayHandle->fileFd = fileFd;
     aplayHandle->buffer = alloca(aplayHandle->frameSz * BUFFER_FRAME_COUNT);
     
-    err=snd_pcm_hw_params_get_period_time(params, &period, NULL);
+    err=snd_pcm_hw_params_get_period_time(hwparams, &period, NULL);
     if (err) {
         afb_req_fail_f (request, "pcm-period", "fail to retrieve period time PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
         goto OnErrorExit;
