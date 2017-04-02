@@ -144,12 +144,12 @@ PUBLIC void playTest(struct afb_req request) {
     hwparamsT wavParams;
     aplayHandleT *aplayHandle=NULL;
     u_char *audiobuf;
+    struct json_object *playbackJ;
 
     
-    char *pcmname="plug:music";
-
+    // stop playing after xx seconds (not implemented)
     const char *tmp = afb_req_value(request, "timeout");
-    if (!tmp) {
+    if (tmp) {
         err = sscanf(tmp, "%d", &timeout);
         if (err != 1 || timeout < 0) {
             afb_req_fail_f (request, "timeout-invalid", "Timeout should be a positive integer in second Timeout=[%s]", tmp);
@@ -162,13 +162,43 @@ PUBLIC void playTest(struct afb_req request) {
         afb_req_fail_f (request, "filename-missing", "No filename given");
         goto OnErrorExit;            
     }
+
+    const char *devid = afb_req_value(request, "devid");
+    if (!devid) {
+        afb_req_fail_f (request, "devid-missing", "No sound card devid given");
+        goto OnErrorExit;            
+    }
+    
+    const char *verb = afb_req_value(request, "verb");
+    if (!verb) {
+        afb_req_fail_f (request, "usecase-missing", "No UCM usecase given");
+        goto OnErrorExit;            
+    }
     
     if ((fileFd = open(filename, O_RDONLY, 0)) == -1) {
         afb_req_fail_f (request, "infile-open", "Fail to open filename=%s err=%s", filename, strerror(fileFd));
         goto OnErrorExit;            
     }
 
-    /* read the WAV file header Alsa aplay method */
+    // check if usecase exist for this board
+    struct json_object *ucmQuery = json_object_new_object();
+    json_object_object_add(ucmQuery, "devid",  json_object_new_string(devid));
+    json_object_object_add(ucmQuery, "verb" ,  json_object_new_string(verb));
+    json_object_object_add(ucmQuery, "values", json_object_new_string("PlaybackPCM"));
+  
+    struct json_object *response = afb_service_call_sync (afbSrv, request, "alsacore", "ucmset", ucmQuery);
+    if (!response) {
+        afb_req_fail_f (request, "usecase-fail", "Fail to open UCM devid=%s usecase verb=%s", devid, verb);
+        goto OnErrorExit;                    
+    }
+    
+    if (!json_object_object_get_ex (response,"PlaybackPCM", &playbackJ)) {
+        afb_req_fail_f (request, "usecase-value", "Fail to return 'PlaybackPCM' value response=%s", json_object_get_string(response));
+        goto OnErrorExit;                    
+    }    
+    const char *playbackPCM=json_object_get_string (playbackJ);
+
+    // read the WAV file header (Alsa aplay code) 
     audiobuf=malloc(1024);
     size_t dta = sizeof(AuHeader);
     if ((size_t)safe_read(fileFd, audiobuf, dta) != dta) {
@@ -183,26 +213,27 @@ PUBLIC void playTest(struct afb_req request) {
     }
     free(audiobuf);
 
-    err = snd_pcm_open(&aplayHandle->pcmHandle, pcmname, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
+        // Load target PCM default config
+    aplayHandle= alloca (sizeof(aplayHandleT));
+    err = snd_pcm_open(&aplayHandle->pcmHandle, playbackPCM, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
     if (err) {
-        afb_req_fail_f (request, "pcm-open", "fail to open PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
+        aplayHandle= NULL;
+        afb_req_fail_f (request, "pcm-open", "fail to open PCM=[%s] Err=%s",  playbackPCM, snd_strerror(err));
         goto OnErrorExit;
     }
-    
-    // Load target PCM default config
-    aplayHandle= alloca (sizeof(aplayHandleT));
+
     snd_pcm_hw_params_alloca(&hwparams);
     snd_pcm_hw_params_any(aplayHandle->pcmHandle, hwparams); 
-  
+    
     err = snd_pcm_hw_params_set_access(aplayHandle->pcmHandle, hwparams,SND_PCM_ACCESS_RW_INTERLEAVED);
     if (err) {
-        afb_req_fail_f (request, "pcm-interleave", "fail to set Interleave mode PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
+        afb_req_fail_f (request, "pcm-interleave", "fail to set Interleave mode PCM=[%s] Err=%s",  playbackPCM, snd_strerror(err));
         goto OnErrorExit;
     }
 
     err = snd_pcm_hw_params_set_format(aplayHandle->pcmHandle, hwparams, wavParams.format);
     if (err) {
-        afb_req_fail_f (request, "pcm-format", "fail to set format=%d PCM=[%s] Err=%s",  wavParams.format, pcmname, snd_strerror(err));
+        afb_req_fail_f (request, "pcm-format", "fail to set format=%d PCM=[%s] Err=%s",  wavParams.format, playbackPCM, snd_strerror(err));
         goto OnErrorExit;
     }
     
@@ -220,7 +251,7 @@ PUBLIC void playTest(struct afb_req request) {
     
     err= snd_pcm_hw_params(aplayHandle->pcmHandle, hwparams);
     if (err) {
-        afb_req_fail_f (request, "pcm-hwparams", "fail to write config hwparams PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
+        afb_req_fail_f (request, "pcm-hwparams", "fail to write config hwparams PCM=[%s] Err=%s",  playbackPCM, snd_strerror(err));
         goto OnErrorExit;
     }
     
@@ -239,7 +270,7 @@ PUBLIC void playTest(struct afb_req request) {
     
     err=snd_pcm_hw_params_get_period_time(hwparams, &period, NULL);
     if (err) {
-        afb_req_fail_f (request, "pcm-period", "fail to retrieve period time PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
+        afb_req_fail_f (request, "pcm-period", "fail to retrieve period time PCM=[%s] Err=%s",  playbackPCM, snd_strerror(err));
         goto OnErrorExit;
     }
     
@@ -253,17 +284,10 @@ PUBLIC void playTest(struct afb_req request) {
     // opening PCM in non blocmode is not enough
     err = snd_pcm_nonblock(aplayHandle->pcmHandle, 1);
     if (err < 0) {
-        afb_req_fail_f (request, "pcm-nobloc", "fail to select nonblock mode PCM=[%s] Err=%s",  pcmname, snd_strerror(err));
+        afb_req_fail_f (request, "pcm-nobloc", "fail to select nonblock mode PCM=[%s] Err=%s",  playbackPCM, snd_strerror(err));
         goto OnErrorExit;
     }
-    
-    // set infile fd for asynchronous operation
-    err = ioctl (aplayHandle->fileFd, F_SETFL, O_ASYNC);
-    if (err <= 0) {
-        afb_req_fail_f (request, "file-async", "fail to set async mode to read file Filename=[%s] Err=%s",  filename, snd_strerror(err));
-        goto OnErrorExit;        
-    }
-       
+           
     // register aplayHandle file fd into binder mainloop
     err = sd_event_add_io(afb_daemon_get_event_loop(afbIface->daemon), &aplayHandle->pollFileSrc, fileFd, EPOLLIN, asyncReadCB, &aplayHandle);
     if (err < 0) {

@@ -29,6 +29,12 @@ SET_TARGET_PROPERTIES(audioplayer-afb PROPERTIES
 	LINK_FLAGS "-Wl,--version-script=${CMAKE_SOURCE_DIR}/export.map"
 )
 
+PKG_CHECK_MODULES(alsa REQUIRED alsa)
+SET(link_libraries
+	${alsa_LIBRARIES}
+        ${link_libraries}
+)
+
 TARGET_LINK_LIBRARIES(audioplayer-afb ${link_libraries})
 INSTALL(TARGETS audioplayer-afb
         LIBRARY DESTINATION ${binding_install_dir})

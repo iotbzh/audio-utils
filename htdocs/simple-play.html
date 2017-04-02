@@ -1,0 +1,25 @@
+<html>
+<head>
+    <title>Hello world test</title>
+    
+    <script type="text/javascript" src="AFB-websock.js"></script>
+    <script type="text/javascript" src="AudioBinding.js"></script>
+    
+
+<body onload="init();">
+    <h1>Hello world test</h1>
+    <button id="connected" onclick="init()">Binder WS Fail</button></li>
+    <br>
+    <ol>
+    <li><button onclick="callbinder('player','simpleplay', {devid:'hw:v1340', verb:'HiFi', filename:'htdocs/sounds/trio-divi-alkazabach.wav'})">Play Music (usecase Music)</button></li>
+    <li><button onclick="callbinder('player','simpleplay', {devid:'hw:v1340', verb:'Navi', filename:'htdocs/sounds/nav-demo-sample.wav'})">Play Navigation (usecase Navi)</button></li>
+    <li><button onclick="callbinder('player','simpleplay', {devid:'hw:v1340', verb:'Notif', filename:'htdocs/sounds/notif-demo-sample.wav'})">Play Notification (usecase Notif)</button></li>
+    </ol>
+    <br>    
+    <div id="main" style="visibility:hidden">
+    <ol>
+    <li>Question <div id="question"></div>
+    <li>Response <div id="output"></div>
+    <li>Events: <div id="outevt"></div>
+    </ol>
+    </div>    

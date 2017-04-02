@@ -42,6 +42,8 @@ typedef struct {
 } hwparamsT;
 
 PUBLIC void pingtest(struct afb_req request);
+PUBLIC json_object* afb_service_call_sync(struct afb_service srvitf, struct afb_req request, char* api, char* verb, struct json_object* queryurl);
+
 PUBLIC ssize_t test_wavefile(struct afb_req request, int fd, hwparamsT *hwparams, u_char *_buffer, size_t size);
 PUBLIC ssize_t safe_read(int fd, void *buf, size_t count);
 

@@ -1,0 +1,33 @@
+---------------------------------------------------------------------
+  Object: Config Sample for Alsa UCM (Usecase Manager)
+  Author: Fulup@iot.bzh
+  Date: April-2017
+-----------------------------------------------------------------------
+
+To customise this file to reflect your config
+  - list your audio device with 'aplay -l | grep card'
+  - Find your device name the one between [] example [Jabra SOLEMATE v1.34.0]
+  - Find your device ID (word right after ':') example v1340
+
+1) Copy this template into /usr/share/alsa/ucm
+2) Rename to reflect your sound card name e.g. 'Jabra SOLEMATE v1.34.0'
+3) Rename Entry config file to CardName.conf e.g. 'Jabra SOLEMATE v1.34.0.conf'
+
+Note: 
+ 1) UCM does not define any default convention for board name. Nevertheless as
+    AGL audio agent translate devid to board name to open UCM. When using AGL user
+    should apply naming convention to SoundCardName.
+ 2) Command will stop at 1st error. You should have a working card to apply test
+ 3) SoftVol are only visible after 1st usage. Test with "amixer -D hw:xxxx contents"
+    to make sure that your added controls are visible for your targeted board.
+
+Testing your config:
+  
+  - list configure verbs
+    alsaucm -c "Jabra SOLEMATE" list _verbs
+
+  - set a usecase
+    alsaucm -c "Jabra SOLEMATE"  set _verb HiFi
+
+  - get a value (note as alsaucm does not have session set/get should be in the command)
+    alsaucm -c "Jabra SOLEMATE"  set _verb HiFi get "OutputDspName//"

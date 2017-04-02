@@ -28,7 +28,8 @@
 
 #include "PlayerBinding.h"
 
-PUBLIC const struct afb_binding_interface *afbIface;   
+PUBLIC const struct afb_binding_interface *afbIface;
+PUBLIC struct afb_service afbSrv;
 
 /*
  * array of the verbs exported to afb-daemon
@@ -36,7 +37,7 @@ PUBLIC const struct afb_binding_interface *afbIface;
 STATIC const struct afb_verb_desc_v1 binding_verbs[] = {
   /* VERB'S NAME            SESSION MANAGEMENT          FUNCTION TO CALL         SHORT DESCRIPTION */
   { .name= "ping",     .session= AFB_SESSION_NONE,  .callback= pingtest,                 .info= "Ping Binding" },
-  { .name= "playtest", .session= AFB_SESSION_NONE,  .callback= playTest,                 .info= "Ping Binding" },
+  { .name= "simpleplay", .session= AFB_SESSION_NONE,  .callback= playTest,                 .info= "Ping Binding" },
 
 /*
   { .name= "open",     .session= AFB_SESSION_CREATE,.callback= playerUcmOpen,           .info= "Open a Dedicated SoundCard" },
@@ -68,6 +69,11 @@ STATIC const struct afb_binding binding_description = {
   }
 };
 
+// this is call when after all bindings are loaded
+PUBLIC int afbBindingV1ServiceInit(struct afb_service service) {
+   afbSrv =  service;
+   return (0);
+};
 
 /*
  * activation function for registering the binding called by afb-daemon

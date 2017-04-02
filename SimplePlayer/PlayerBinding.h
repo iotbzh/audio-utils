@@ -25,6 +25,8 @@
 
 // import from AlsaAfbBinding
 extern const struct afb_binding_interface *afbIface;
+extern struct afb_service afbSrv;
+
 PUBLIC void playTest(struct afb_req request);
 
 
