@@ -76,10 +76,10 @@ cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR ..
 make install
 
 # Start From Development Tree
-  afb-daemon --verbose --token="" --ldpaths=./build --port=1235 --roothttp=./htdoc
+  afb-daemon --verbose --token="" --ldpaths=./build --port=1235 --roothttp=./htdoc --ws-client=unix/$DEST/share/wssocks/alsacore
 
 # Start From $INSTALL_DIR
-  afb-daemon --verbose --token="" --ldpaths=$INSTALL_DIR/lib/utils --port=1235 --roothttp=$INSTALL_DIR/htdocs/utils-bindings
+  afb-daemon --verbose --token="" --ldpaths=$INSTALL_DIR/lib/utils --port=1235 --roothttp=$INSTALL_DIR/htdocs/utils-bindings --ws-client=unix:$INSTALL_DIR/share/wssocks/alsacore
 # replace hd:XX with your own sound card ID ex: "hw:0", "hw:PCH", ...
 Start a browser on http://localhost:1235   # WARNING: should not conflic with audio-binding port
 ```
